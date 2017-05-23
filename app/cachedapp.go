@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"time"
-	"github.com/zqdlove/cache3go"
+	"github.com/zqdlove/cachego"
 )
 
 type myStruct struct {
