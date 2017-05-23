@@ -51,6 +51,12 @@ func (item *CacheItem) CreatedOn() time.Time {
 	return item.createdOn
 }
 
+func (item *CacheItem) AccessCount() int64 {
+	item.RLock()
+	defer item.RUnlock()
+	return item.accessCount
+}
+
 func (item *CacheItem) Key() interface{} {
 	return item.key
 }
