@@ -11,7 +11,7 @@ func main() {
 
 	cache.SetDataLoader(func(key interface{}, args ...interface{}) *cachego.CacheItem {
 		val := "This is test with key" + key.(string)
-		item := cache3go.NewCacheItem(key , 0 , val)
+		item := cachego.NewCacheItem(key , 0 , val)
 		return item
 	})
 	for i := 0; i < 10; i++ {
