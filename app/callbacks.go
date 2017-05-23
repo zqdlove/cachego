@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	cache := cache3go.Cache("myCache")
+	cache := cachego.Cache("myCache")
 
 	cache.SetAddedItemCallback(func(entry *cachego.CacheItem){
 		fmt.Println("Added:", entry.Key(), entry.Data(), entry.CreatedOn())
