@@ -4,8 +4,8 @@ import (
 //	"bytes"
 //	"log"
 //	"strconv"
-//	"sync"
-//	"sync/atomic"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -72,5 +72,72 @@ func TestExists(t *testing.T) {
 	table.Add(k, 0, v)
 	if !table.Exists(k) {
 		t.Error("Error verifying data in cache")
+	}
+}
+
+func TestNotFoundAdd(t *testing.T) {
+	table := Cache("testNotFoundAdd")
+
+	if !table.NotFoundAdd(k, 0, v) {
+		t.Error("Error verifying NotFound, data not in cache")
+	}
+
+	if table.NotFoundAdd(k, 0, v) {
+		t.Error("Error verifying NotFound data in cache")
+	}
+}
+
+func TestNotFoundAddConcurrency(t *testing.T) {
+	table := Cache("testNotFoundAddConcurrency")
+	var finish sync.WaitGroup
+	var added int32
+	var idle int32
+
+	fn := func(id int) {
+		for i := 0; i < 100; i++ {
+			if table.NotFoundAdd(i, 0, i+id) {
+				atomic.AddInt32(&added, 1)
+			} else {
+				atomic.AddInt32(&idle, 1)
+			}
+			time.Sleep(0)
+		}
+		finish.Done()
+	}
+	finish.Add(10)
+	go fn(0x0000)
+	go fn(0x1100)
+	go fn(0x2200)
+	go fn(0x3300)
+	go fn(0x4400)
+	go fn(0x5500)
+	go fn(0x6600)
+	go fn(0x7700)
+	go fn(0x8800)
+	go fn(0x9900)
+	finish.Wait()
+
+	t.Log(added, idle)
+
+	table.Foreach(func(key interface{}, item *CacheItem) {
+		v, _ := item.Data().(int)
+		k, _ := key.(int)
+		t.Logf("%02x %04x\n", k, v)
+	})
+}
+
+func TestCacheKeepAlive(t *testing.T) {
+	table := Cache("testKeepAlive")
+	p := table.Add(k, 100*time.Millisecond, v)
+
+	time.Sleep(50 * time.Millisecond)
+	p.KeepAlive()
+	time.Sleep(75 * time.Millisecond)
+	if !table.Exists(k) {
+		t.Error("Error keeping item alive")
+	}
+	time.Sleep(75 * time.Millisecond)
+	if table.Exists(k) {
+		t.Error("Error expiring item after keeping it alive")
 	}
 }
