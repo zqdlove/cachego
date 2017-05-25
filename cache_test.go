@@ -1,9 +1,9 @@
 package cachego
 
 import (
-//	"bytes"
-//	"log"
-//	"strconv"
+	"bytes"
+	"log"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -139,5 +139,153 @@ func TestCacheKeepAlive(t *testing.T) {
 	time.Sleep(75 * time.Millisecond)
 	if table.Exists(k) {
 		t.Error("Error expiring item after keeping it alive")
+	}
+}
+
+func TestDelete(t *testing.T) {
+	table := Cache("testDelete")
+	table.Add(k, 0 , v)
+
+	p, err := table.Value(k)
+	if err != nil || p == nil || p.Data().(string) != v {
+		t.Error("Error retrieving data from cache", err)
+	}
+	table.Delete(k)
+	p, err = table.Value(k)
+	if err == nil || p != nil {
+		t.Error("Error deleting data")
+	}
+	_, err  = table.Delete(k)
+	if  err == nil {
+		t.Error("Expected error deleting item")
+	}
+}
+
+func TestFlush(t *testing.T) {
+	table := Cache("testFluash")
+	table.Add(k, 10*time.Second, v)
+	table.Flush()
+
+	p, err := table.Value(k)
+	if err  == nil || p != nil {
+		t.Error("Error flushing table")
+	}
+	if table.Count() != 0 {
+		t.Error("Error Verifying count of flushed table")
+	}
+}
+
+func TestCount(t *testing.T) {
+	table := Cache("testCount")
+	count := 10000
+	for i := 0; i< count; i++ {
+		key := k + strconv.Itoa(i)
+		table.Add(key, 10*time.Second, v)
+	}
+	for i :=0; i < count; i++ {
+		key := k + strconv.Itoa(i)
+		p, err := table.Value(key)
+		if err != nil || p == nil || p.Data().(string) != v {
+			t.Error("Error retrieving data")
+		}
+	}
+	if table.Count() != count {
+		t.Error("Data count mismatch")
+	}
+}
+//没明白
+func TestDataLoader(t *testing.T) {
+	table := Cache("testDataLoader")
+	table.SetDataLoader(func(key interface{}, args ...interface{}) *CacheItem {
+		var item *CacheItem
+		if key.(string) != "nil" {
+			val := k + key.(string)
+			i := NewCacheItem(key, 500*time.Millisecond, val)
+			item = i
+		}
+		return item
+	})
+
+	p, err := table.Value("nil")
+	if err == nil || table.Exists("nil") {
+		t.Error("Error validating data loader for nil values")
+	}
+
+	for i := 0; i < 10; i++ {
+		key := k + strconv.Itoa(i)
+		vp := k + key
+		p, err = table.Value(key)
+		if err != nil || p == nil || p.Data().(string) !=vp {
+			t.Error("Error validating data loader")
+		}
+	}
+}
+
+func TestAccessCount(t *testing.T) {
+	count := 100
+	table := Cache("testAccessCount")
+	for i := 0; i < count; i++ {
+		table.Add(i, 10*time.Second, v)
+	}
+	for  i := 0; i < count; i++ {
+		for j := 0; j < i; j++ {
+			table.Value(i)
+		}
+	}
+
+	ma := table.MostAccessed(int64(count))
+	for i , item := range ma {
+		if item.Key() != count-1-i {
+			t.Error("Most accessed items seem to be sortes incorrectly")
+		}
+	}
+
+	ma = table.MostAccessed(int64(count -1 ))
+	if  len(ma) != count -1 {
+		t.Error("MostAccessed returns incorrect amount of items")
+	}
+}
+
+func TestCallbacks(t *testing.T) {
+	addedKey := ""
+	removeKey := ""
+	expired := false
+
+	table := Cache("testCallbacks")
+	table.SetAddedItemCallback(func(item *CacheItem) {
+		addedKey = item.Key().(string)
+	})
+	table.SetAboutToDeleteItemCallback(func(item *CacheItem) {
+		removeKey = item.Key().(string)
+	})
+	i := table.Add(k, 500*time.Millisecond, v)
+	i.SetAboutToExpireCallback(func(key interface{}) {
+		expired = true
+	})
+
+	time.Sleep(250 * time.Millisecond)
+	if addedKey != k {
+		t.Error("AddedItem Callback not working")
+	}
+	time.Sleep(5000 * time.Millisecond)
+	if removeKey != k {
+		t.Error("AboutToDeleteItem callback not working:" + k + "_" + removeKey)
+	}
+
+	if !expired {
+		t.Error("AboutToExpire callback not working")
+	}
+}
+
+func  TestLogger(t * testing.T) {
+	out := new(bytes.Buffer)
+	l := log.New(out, "cachego", log.Ldate | log.Ltime)
+
+	table := Cache("testLogger")
+	table.SetLogger(l)
+	table.Add(k, 1*time.Second, v)
+
+	if out.Len() == 0 {
+		t.Error("Logger is empty")
 	}
 }
